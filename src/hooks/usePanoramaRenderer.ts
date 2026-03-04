@@ -395,23 +395,23 @@ export function usePanoramaRenderer({
           }
         }
       } else {
-        if (!isDraggingRef.current && inertiaActiveRef.current) {
-          targetLonRef.current -= velocityLonRef.current;
-          targetLatRef.current = Math.max(
-            -85,
-            Math.min(85, targetLatRef.current + velocityLatRef.current)
-          );
+if (!isDraggingRef.current && inertiaActiveRef.current) {
+  targetLonRef.current += velocityLonRef.current;
+  targetLatRef.current = Math.max(
+    -85,
+    Math.min(85, targetLatRef.current - velocityLatRef.current)
+  );
 
-          velocityLonRef.current *= INERTIA_DECAY;
-          velocityLatRef.current *= INERTIA_DECAY;
+  velocityLonRef.current *= INERTIA_DECAY;
+  velocityLatRef.current *= INERTIA_DECAY;
 
-          if (
-            Math.abs(velocityLonRef.current) < INERTIA_MIN_SPEED &&
-            Math.abs(velocityLatRef.current) < INERTIA_MIN_SPEED
-          ) {
-            inertiaActiveRef.current = false;
-          }
-        }
+  if (
+    Math.abs(velocityLonRef.current) < INERTIA_MIN_SPEED &&
+    Math.abs(velocityLatRef.current) < INERTIA_MIN_SPEED
+  ) {
+    inertiaActiveRef.current = false;
+  }
+}
 
         // Smooth interpolation for manual controls
         lonRef.current += (targetLonRef.current - lonRef.current) * LERP_FACTOR;
