@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import Squares from "./ui/Squares";
+import ShinyText from "./ui/ShinyText";
+import BlurText from "./ui/BlurText";
 
 interface UploadScreenProps {
   onImageSelect: (file: File) => void;
@@ -78,8 +81,19 @@ export default function UploadScreen({ onImageSelect }: UploadScreenProps) {
   }, []);
 
   return (
-    <div className="flex h-full w-full items-center justify-center bg-[#09090b] p-4">
-      <div className="w-full max-w-md text-center">
+    <div className="relative flex h-full w-full items-center justify-center bg-[#09090b] p-4">
+      {/* Animated grid background */}
+      <div className="pointer-events-none absolute inset-0">
+        <Squares
+          direction="diagonal"
+          speed={0.3}
+          borderColor="rgba(139,92,246,0.12)"
+          squareSize={48}
+          hoverFillColor="rgba(139,92,246,0.06)"
+        />
+      </div>
+
+      <div className="relative z-10 w-full max-w-md text-center">
         {/* Globe icon */}
         <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center">
           <svg
@@ -102,12 +116,21 @@ export default function UploadScreen({ onImageSelect }: UploadScreenProps) {
           </svg>
         </div>
 
-        <h1 className="mb-2 text-2xl font-bold text-white">
-          360° Panorama Viewer
+        <h1 className="mb-2 text-2xl font-bold">
+          <ShinyText
+            text="360° Panorama Viewer"
+            speed={3}
+            color="#a1a1aa"
+            shineColor="#a78bfa"
+          />
         </h1>
-        <p className="mb-8 text-sm text-zinc-400">
-          Upload an equirectangular panorama image to explore it in 360°
-        </p>
+        <BlurText
+          text="Upload an equirectangular panorama image to explore it in 360°"
+          delay={50}
+          animateBy="words"
+          direction="top"
+          className="mb-8 justify-center text-sm text-zinc-400"
+        />
 
         {/* Upload zone */}
         <div

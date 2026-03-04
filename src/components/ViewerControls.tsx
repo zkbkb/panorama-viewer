@@ -50,7 +50,7 @@ export default function ViewerControls({
   };
 
   const btnClass =
-    "pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm transition-colors hover:bg-black/70 active:bg-black/80";
+    "pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm transition-all hover:bg-black/70 hover:scale-105 active:bg-black/80 active:scale-95";
 
   return (
     <div className="pointer-events-none fixed inset-0 z-10">

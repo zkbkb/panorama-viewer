@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { isMobile } from "../utils/device";
+import BlurText from "./ui/BlurText";
 
 interface HintToastProps {
   gyroEnabled: boolean;
@@ -26,8 +27,14 @@ export default function HintToast({
 
   return (
     <div className={`pointer-events-none transition-opacity duration-700 ${fading ? "opacity-0" : "opacity-100"}`}>
-      <div className="rounded-full bg-black/60 px-5 py-2.5 text-sm text-white/90 backdrop-blur-sm">
-        {text}
+      <div className="rounded-full bg-black/60 px-5 py-2.5 backdrop-blur-sm">
+        <BlurText
+          text={text}
+          delay={60}
+          animateBy="words"
+          direction="bottom"
+          className="justify-center text-sm text-white/90"
+        />
       </div>
     </div>
   );
