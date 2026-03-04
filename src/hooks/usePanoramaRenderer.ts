@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import * as THREE from "three";
 import { setQuaternionFromOrientation } from "../utils/orientation";
 import type { GyroscopeOrientation } from "./useGyroscope";
@@ -55,8 +55,15 @@ export function usePanoramaRenderer({
   const gyroDragStartOffsetLonRef = useRef(0);
   const gyroDragStartOffsetLatRef = useRef(0);
 
+  // Reference quaternions for smooth gyro activation (no camera jump)
+  const initialGyroQRef = useRef<THREE.Quaternion | null>(null);
+  const initialCameraQRef = useRef<THREE.Quaternion | null>(null);
+  // Track current raw gyro quaternion for recenter
+  const currentGyroQRef = useRef(new THREE.Quaternion());
+
   // Gyro enabled ref (to access in animation loop without stale closure)
   const gyroEnabledRef = useRef(gyroEnabled);
+  const prevGyroEnabledRef = useRef(gyroEnabled);
   gyroEnabledRef.current = gyroEnabled;
 
   // Screen orientation for gyroscope
@@ -232,6 +239,9 @@ export function usePanoramaRenderer({
     // Camera target vector (reused each frame)
     const target = new THREE.Vector3();
     const gyroQuaternion = new THREE.Quaternion();
+    const inverseInitQ = new THREE.Quaternion();
+    const offsetQ = new THREE.Quaternion();
+    const offsetEuler = new THREE.Euler();
 
     // Animation loop
     const animate = () => {
@@ -241,6 +251,13 @@ export function usePanoramaRenderer({
       fovRef.current += (targetFovRef.current - fovRef.current) * LERP_FACTOR;
       camera.fov = fovRef.current;
       camera.updateProjectionMatrix();
+
+      // Detect gyro toggle: clear reference quaternions when disabled
+      if (prevGyroEnabledRef.current && !gyroEnabledRef.current) {
+        initialGyroQRef.current = null;
+        initialCameraQRef.current = null;
+      }
+      prevGyroEnabledRef.current = gyroEnabledRef.current;
 
       if (gyroEnabledRef.current) {
         const ori = orientationRef.current;
@@ -257,15 +274,27 @@ export function usePanoramaRenderer({
             gamma,
             orient
           );
-          camera.quaternion.copy(gyroQuaternion);
+          currentGyroQRef.current.copy(gyroQuaternion);
+
+          // On first gyro frame, capture reference quaternions
+          if (!initialGyroQRef.current) {
+            initialGyroQRef.current = gyroQuaternion.clone();
+            initialCameraQRef.current = camera.quaternion.clone();
+          }
+
+          // camera = initialCameraQ * inverse(initialGyroQ) * currentGyroQ
+          inverseInitQ.copy(initialGyroQRef.current).invert();
+          camera.quaternion
+            .copy(initialCameraQRef.current!)
+            .multiply(inverseInitQ)
+            .multiply(gyroQuaternion);
 
           // Apply touch offset as additional rotation
           if (
             gyroOffsetLonRef.current !== 0 ||
             gyroOffsetLatRef.current !== 0
           ) {
-            const offsetQ = new THREE.Quaternion();
-            const offsetEuler = new THREE.Euler(
+            offsetEuler.set(
               -gyroOffsetLatRef.current * DEG2RAD,
               -gyroOffsetLonRef.current * DEG2RAD,
               0,
@@ -354,5 +383,28 @@ export function usePanoramaRenderer({
     );
   }, [imageUrl]);
 
-  return { isLoading };
+  const recenter = useCallback(() => {
+    // Reset reference: current device orientation = current camera direction
+    initialGyroQRef.current = currentGyroQRef.current.clone();
+    if (cameraRef.current) {
+      // Capture camera quaternion WITHOUT the touch offset
+      const cam = cameraRef.current.quaternion.clone();
+      // Undo touch offset to get the pure gyro-mapped orientation
+      if (gyroOffsetLonRef.current !== 0 || gyroOffsetLatRef.current !== 0) {
+        const undoEuler = new THREE.Euler(
+          -gyroOffsetLatRef.current * DEG2RAD,
+          -gyroOffsetLonRef.current * DEG2RAD,
+          0,
+          "YXZ"
+        );
+        const undoQ = new THREE.Quaternion().setFromEuler(undoEuler).invert();
+        cam.multiply(undoQ);
+      }
+      initialCameraQRef.current = cam;
+    }
+    gyroOffsetLonRef.current = 0;
+    gyroOffsetLatRef.current = 0;
+  }, []);
+
+  return { isLoading, recenter };
 }
