@@ -10,7 +10,7 @@ interface ViewerControlsProps {
   onToggleFullscreen: () => void;
   gyroAvailable: boolean;
   gyroEnabled: boolean;
-  onToggleGyro: () => void;
+  onToggleGyro: () => void | Promise<void>;
   onRecenter: () => void;
   horizonLocked: boolean;
   onToggleHorizonLock: () => void;
@@ -44,7 +44,7 @@ export default function ViewerControls({
 
   const handleEnableFromPrompt = () => {
     setShowGyroPrompt(false);
-    onToggleGyro();
+    Promise.resolve(onToggleGyro()).catch(console.error);
   };
 
   const btnClass =
@@ -192,7 +192,7 @@ export default function ViewerControls({
 
             {/* Gyro toggle button */}
             <button
-              onClick={onToggleGyro}
+              onClick={() => Promise.resolve(onToggleGyro()).catch(console.error)}
               className={`pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-sm transition-colors ${
                 gyroEnabled
                   ? "bg-white/90 text-black"

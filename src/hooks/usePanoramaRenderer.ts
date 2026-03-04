@@ -285,7 +285,9 @@ export function usePanoramaRenderer({
 
         // Extract camera forward direction → lon/lat for seamless transition
         const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-        const extractedLat = Math.asin(Math.max(-1, Math.min(1, fwd.y))) / DEG2RAD;
+        const extractedLat = Math.max(-85, Math.min(85,
+          Math.asin(Math.max(-1, Math.min(1, fwd.y))) / DEG2RAD
+        ));
         const extractedLon = Math.atan2(fwd.z, fwd.x) / DEG2RAD;
         lonRef.current = extractedLon;
         latRef.current = extractedLat;
