@@ -124,6 +124,7 @@ export function usePanoramaRenderer({
     // --- Event Handlers ---
 
     const onPointerDown = (e: PointerEvent) => {
+      canvas.setPointerCapture(e.pointerId);
       pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
       if (pointersRef.current.size === 1) {
@@ -194,6 +195,7 @@ export function usePanoramaRenderer({
     };
 
     const onPointerUp = (e: PointerEvent) => {
+      canvas.releasePointerCapture(e.pointerId);
       pointersRef.current.delete(e.pointerId);
       if (pointersRef.current.size === 0) {
         isDraggingRef.current = false;
