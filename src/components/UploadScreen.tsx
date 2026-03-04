@@ -1,4 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import Squares from "./ui/Squares";
+import BlurText from "./ui/BlurText";
+import ShinyText from "./ui/ShinyText";
+import StarBorder from "./ui/StarBorder";
 
 interface UploadScreenProps {
   onImageSelect: (file: File) => void;
@@ -78,8 +82,19 @@ export default function UploadScreen({ onImageSelect }: UploadScreenProps) {
   }, []);
 
   return (
-    <div className="flex h-full w-full items-center justify-center bg-[#09090b] p-4">
-      <div className="w-full max-w-md text-center">
+    <div className="relative flex h-full w-full items-center justify-center bg-[#09090b] p-4">
+      {/* Animated background */}
+      <div className="absolute inset-0 z-0">
+        <Squares
+          direction="diagonal"
+          speed={0.3}
+          borderColor="rgba(139, 92, 246, 0.12)"
+          squareSize={44}
+          hoverFillColor="rgba(139, 92, 246, 0.06)"
+        />
+      </div>
+
+      <div className="relative z-10 w-full max-w-md text-center">
         {/* Globe icon */}
         <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center">
           <svg
@@ -102,46 +117,64 @@ export default function UploadScreen({ onImageSelect }: UploadScreenProps) {
           </svg>
         </div>
 
-        <h1 className="mb-2 text-2xl font-bold text-white">
-          360° Panorama Viewer
-        </h1>
-        <p className="mb-8 text-sm text-zinc-400">
-          Upload an equirectangular panorama image to explore it in 360°
+        {/* Animated title */}
+        <BlurText
+          text="360° Panorama Viewer"
+          className="mb-2 text-2xl font-bold text-white justify-center"
+          delay={80}
+          animateBy="words"
+          direction="bottom"
+        />
+
+        {/* Shiny subtitle */}
+        <p className="mb-8 text-sm">
+          <ShinyText
+            text="Upload an equirectangular panorama image to explore it in 360°"
+            speed={4}
+            className="text-zinc-400"
+          />
         </p>
 
-        {/* Upload zone */}
-        <div
-          onClick={() => fileInputRef.current?.click()}
-          onDrop={handleDrop}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          className={`cursor-pointer rounded-xl border-2 border-dashed p-10 transition-colors ${
-            isDragOver
-              ? "border-violet-400 bg-violet-400/10"
-              : "border-zinc-700 hover:border-zinc-500 hover:bg-zinc-900"
-          }`}
+        {/* Upload zone with animated border */}
+        <StarBorder
+          className="w-full"
+          color={isDragOver ? "#8b5cf6" : "#6d28d9"}
+          speed={isDragOver ? "3s" : "6s"}
+          thickness={2}
         >
-          <div className="mb-3 text-4xl">
-            <svg
-              className="mx-auto h-10 w-10 text-zinc-500"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={1.5}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
-              />
-            </svg>
+          <div
+            onClick={() => fileInputRef.current?.click()}
+            onDrop={handleDrop}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            className={`cursor-pointer rounded-[10px] p-10 transition-colors ${
+              isDragOver
+                ? "bg-violet-400/10"
+                : "bg-[#09090b] hover:bg-zinc-900/80"
+            }`}
+          >
+            <div className="mb-3 text-4xl">
+              <svg
+                className="mx-auto h-10 w-10 text-zinc-500"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={1.5}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
+                />
+              </svg>
+            </div>
+            <p className="text-sm text-zinc-300">
+              {isDragOver
+                ? "Drop your panorama here"
+                : "Click or drag & drop a panorama image"}
+            </p>
           </div>
-          <p className="text-sm text-zinc-300">
-            {isDragOver
-              ? "Drop your panorama here"
-              : "Click or drag & drop a panorama image"}
-          </p>
-        </div>
+        </StarBorder>
 
         <p className="mt-3 text-xs text-zinc-600">
           Supports JPG, PNG, WebP

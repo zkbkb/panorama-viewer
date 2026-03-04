@@ -1,8 +1,10 @@
 import { useCallback, useRef, useState } from "react";
+import { motion } from "framer-motion";
 import { usePanoramaRenderer } from "../hooks/usePanoramaRenderer";
 import { useGyroscope } from "../hooks/useGyroscope";
 import { useFullscreen } from "../hooks/useFullscreen";
 import ViewerControls from "./ViewerControls";
+import DecryptedText from "./ui/DecryptedText";
 
 interface PanoramaViewerProps {
   imageUrl: string;
@@ -43,8 +45,20 @@ export default function PanoramaViewer({
       {isLoading && (
         <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/80">
           <div className="text-center">
-            <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-2 border-zinc-600 border-t-violet-400" />
-            <p className="text-sm text-zinc-400">Loading panorama...</p>
+            {/* Pulse ring loader */}
+            <div className="relative mx-auto mb-4 h-12 w-12">
+              <div className="absolute inset-0 rounded-full border-2 border-violet-400/30 animate-ping" />
+              <div className="absolute inset-1 rounded-full border-2 border-transparent border-t-violet-400 animate-spin" />
+              <div className="absolute inset-2.5 rounded-full border border-transparent border-t-violet-300/60 animate-spin [animation-direction:reverse] [animation-duration:1.5s]" />
+            </div>
+            <DecryptedText
+              text="Loading panorama..."
+              speed={40}
+              sequential
+              animateOn="view"
+              className="text-sm text-zinc-400"
+              encryptedClassName="text-sm text-violet-400/60"
+            />
           </div>
         </div>
       )}
@@ -52,7 +66,12 @@ export default function PanoramaViewer({
       {/* Error overlay */}
       {error && (
         <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/80">
-          <div className="text-center max-w-sm px-6">
+          <motion.div
+            className="text-center max-w-sm px-6"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
+          >
             <svg
               className="mx-auto mb-4 h-12 w-12 text-red-400"
               fill="none"
@@ -73,7 +92,7 @@ export default function PanoramaViewer({
             >
               Go back
             </button>
-          </div>
+          </motion.div>
         </div>
       )}
 

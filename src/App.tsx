@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import UploadScreen from "./components/UploadScreen";
 import PanoramaViewer from "./components/PanoramaViewer";
 
@@ -24,11 +25,33 @@ function App() {
     setImageUrl(null);
   }, []);
 
-  if (imageUrl) {
-    return <PanoramaViewer imageUrl={imageUrl} onBack={handleBack} />;
-  }
-
-  return <UploadScreen onImageSelect={handleImageSelect} />;
+  return (
+    <AnimatePresence mode="wait">
+      {imageUrl ? (
+        <motion.div
+          key="viewer"
+          className="h-full w-full"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.3 }}
+        >
+          <PanoramaViewer imageUrl={imageUrl} onBack={handleBack} />
+        </motion.div>
+      ) : (
+        <motion.div
+          key="upload"
+          className="h-full w-full"
+          initial={{ opacity: 0, scale: 0.98 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 1.02 }}
+          transition={{ duration: 0.35 }}
+        >
+          <UploadScreen onImageSelect={handleImageSelect} />
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
 }
 
 export default App;
