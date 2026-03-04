@@ -92,6 +92,10 @@ export function usePanoramaRenderer({
   // Default camera orientation (lon=0, lat=0) for recenter
   const defaultCameraQRef = useRef(new THREE.Quaternion());
 
+  // Recenter animation state
+  const recenterFromQRef = useRef(new THREE.Quaternion());
+  const recenterProgressRef = useRef(1); // 1 = no animation, <1 = animating
+
   // Refs for animation loop (avoid stale closures)
   const gyroEnabledRef = useRef(gyroEnabled);
   const prevGyroEnabledRef = useRef(gyroEnabled);
@@ -488,6 +492,14 @@ export function usePanoramaRenderer({
             rollCorrectionEuler.z = 0;
             camera.quaternion.setFromEuler(rollCorrectionEuler);
           }
+
+          // Smooth recenter animation: SLERP from captured orientation to target
+          if (recenterProgressRef.current < 1) {
+            recenterProgressRef.current = Math.min(1, recenterProgressRef.current + 0.06);
+            // Ease-out curve for natural deceleration
+            const t = 1 - Math.pow(1 - recenterProgressRef.current, 3);
+            camera.quaternion.slerpQuaternions(recenterFromQRef.current, camera.quaternion, t);
+          }
         }
       } else {
         // Apply inertia when not dragging
@@ -601,7 +613,12 @@ export function usePanoramaRenderer({
   }, [imageUrl]);
 
   const recenter = useCallback(() => {
-    // Reset to panorama center: current device orientation = initial view
+    // Capture current camera orientation as the animation start point
+    if (cameraRef.current) {
+      recenterFromQRef.current.copy(cameraRef.current.quaternion);
+      recenterProgressRef.current = 0; // Start animation
+    }
+    // Set target: current device orientation = initial view (panorama center)
     initialGyroQRef.current = currentGyroQRef.current.clone();
     initialCameraQRef.current = defaultCameraQRef.current.clone();
     gyroOffsetLonRef.current = 0;
