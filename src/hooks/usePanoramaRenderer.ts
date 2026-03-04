@@ -227,8 +227,12 @@ export function usePanoramaRenderer({
           gyroDragStartOffsetLonRef.current = gyroOffsetLonRef.current;
           gyroDragStartOffsetLatRef.current = gyroOffsetLatRef.current;
         } else {
-          dragStartLonRef.current = targetLonRef.current;
-          dragStartLatRef.current = targetLatRef.current;
+          // Sync target to the currently displayed position so that
+          // starting a drag during inertia doesn't cause a jump
+          targetLonRef.current = lonRef.current;
+          targetLatRef.current = latRef.current;
+          dragStartLonRef.current = lonRef.current;
+          dragStartLatRef.current = latRef.current;
         }
         canvas.style.cursor = "grabbing";
       }
@@ -320,8 +324,8 @@ export function usePanoramaRenderer({
           gyroDragStartOffsetLonRef.current = gyroOffsetLonRef.current;
           gyroDragStartOffsetLatRef.current = gyroOffsetLatRef.current;
         } else {
-          dragStartLonRef.current = targetLonRef.current;
-          dragStartLatRef.current = targetLatRef.current;
+          dragStartLonRef.current = lonRef.current;
+          dragStartLatRef.current = latRef.current;
         }
       }
     };
@@ -371,6 +375,7 @@ export function usePanoramaRenderer({
     const offsetEuler = new THREE.Euler();
     const rollCorrectionEuler = new THREE.Euler();
     const forwardVec = new THREE.Vector3();
+    const recenterTargetQ = new THREE.Quaternion();
 
     // Animation loop
     const animate = () => {
@@ -498,7 +503,10 @@ export function usePanoramaRenderer({
             recenterProgressRef.current = Math.min(1, recenterProgressRef.current + 0.06);
             // Ease-out curve for natural deceleration
             const t = 1 - Math.pow(1 - recenterProgressRef.current, 3);
-            camera.quaternion.slerpQuaternions(recenterFromQRef.current, camera.quaternion, t);
+            // Copy target first to avoid self-aliasing (slerpQuaternions
+            // internally does this.copy(qa) which would destroy qb if qb === this)
+            recenterTargetQ.copy(camera.quaternion);
+            camera.quaternion.slerpQuaternions(recenterFromQRef.current, recenterTargetQ, t);
           }
         }
       } else {
