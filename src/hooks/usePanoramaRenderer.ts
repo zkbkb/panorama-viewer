@@ -222,7 +222,7 @@ export function usePanoramaRenderer({
         velocityLatRef.current = velocityLatRef.current * 0.6 + deltaY * 0.4;
 
         if (gyroEnabledRef.current) {
-          gyroOffsetLonRef.current -= deltaX;
+          gyroOffsetLonRef.current += deltaX;
           gyroOffsetLatRef.current = Math.max(
             -85,
             Math.min(
@@ -231,7 +231,7 @@ export function usePanoramaRenderer({
             )
           );
         } else {
-          targetLonRef.current += deltaX;
+          targetLonRef.current -= deltaX;
           targetLatRef.current = Math.max(
             -85,
             Math.min(85, targetLatRef.current + deltaY)
@@ -401,7 +401,7 @@ export function usePanoramaRenderer({
         }
       } else {
         if (!isDraggingRef.current && inertiaActiveRef.current) {
-          targetLonRef.current += velocityLonRef.current;
+          targetLonRef.current -= velocityLonRef.current;
           targetLatRef.current = Math.max(
             -85,
             Math.min(85, targetLatRef.current + velocityLatRef.current)
