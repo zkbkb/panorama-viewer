@@ -4,26 +4,49 @@ interface HintToastProps {
   gyroEnabled: boolean;
 }
 
+function readHintSeen(): boolean {
+  try {
+    return localStorage.getItem("panorama.hint.seen") === "1";
+  } catch {
+    return false;
+  }
+}
+
 export default function HintToast({
   gyroEnabled,
 }: HintToastProps) {
   const [visible, setVisible] = useState(true);
+  const [hasSeenHint] = useState(readHintSeen);
 
   useEffect(() => {
-    const timer = setTimeout(() => setVisible(false), 4000);
+    const duration = hasSeenHint ? 2200 : 4500;
+    const timer = setTimeout(() => setVisible(false), duration);
+
+    if (!hasSeenHint) {
+      try {
+        localStorage.setItem("panorama.hint.seen", "1");
+      } catch {
+        // Ignore storage failures
+      }
+    }
+
     return () => clearTimeout(timer);
-  }, []);
+  }, [hasSeenHint]);
 
   const isMobile =
     typeof navigator !== "undefined" && /Mobi|Android/i.test(navigator.userAgent);
 
   let text: string;
   if (gyroEnabled) {
-    text = "Move your phone to explore";
+    text = hasSeenHint ? "Move phone" : "Move your phone to explore";
   } else if (isMobile) {
-    text = "Drag to look around \u00B7 Pinch to zoom";
+    text = hasSeenHint
+      ? "Drag to look \u00B7 Pinch"
+      : "Drag to look around \u00B7 Pinch to zoom";
   } else {
-    text = "Drag to look around \u00B7 Scroll to zoom";
+    text = hasSeenHint
+      ? "Drag to look \u00B7 Scroll"
+      : "Drag to look around \u00B7 Scroll to zoom";
   }
 
   if (!visible) return null;

@@ -27,24 +27,47 @@ export default function ViewerControls({
   horizonLocked,
   onToggleHorizonLock,
 }: ViewerControlsProps) {
-  // Gyro discovery prompt — shown once per viewer session on mobile
+  const [hasSeenGyroPrompt, setHasSeenGyroPrompt] = useState(() => {
+    try {
+      return localStorage.getItem("panorama.gyro.prompt.seen") === "1";
+    } catch {
+      return false;
+    }
+  });
+
+  // Gyro discovery prompt — first time shows full copy, returning users get short prompt
   const [showGyroPrompt, setShowGyroPrompt] = useState(
     isMobile && gyroAvailable
   );
 
-  // Derived: hide when gyro has been enabled (no effect needed)
   const gyroPromptVisible = showGyroPrompt && !gyroEnabled;
 
-  // Auto-dismiss after 8 seconds
   useEffect(() => {
     if (!showGyroPrompt) return;
-    const timer = setTimeout(() => setShowGyroPrompt(false), 8000);
+    const timeoutMs = hasSeenGyroPrompt ? 3500 : 8000;
+    const timer = setTimeout(() => setShowGyroPrompt(false), timeoutMs);
     return () => clearTimeout(timer);
-  }, [showGyroPrompt]);
+  }, [showGyroPrompt, hasSeenGyroPrompt]);
+
+  const markGyroPromptSeen = () => {
+    if (hasSeenGyroPrompt) return;
+    setHasSeenGyroPrompt(true);
+    try {
+      localStorage.setItem("panorama.gyro.prompt.seen", "1");
+    } catch {
+      // Ignore storage failures
+    }
+  };
 
   const handleEnableFromPrompt = () => {
     setShowGyroPrompt(false);
+    markGyroPromptSeen();
     Promise.resolve(onToggleGyro()).catch(console.error);
+  };
+
+  const handleDismissPrompt = () => {
+    setShowGyroPrompt(false);
+    markGyroPromptSeen();
   };
 
   const btnClass =
@@ -125,7 +148,9 @@ export default function ViewerControls({
           {gyroPromptVisible && (
             <div className="pointer-events-auto flex items-center gap-3 rounded-2xl bg-black/70 px-4 py-3 backdrop-blur-sm">
               <span className="text-sm text-white/90">
-                Enable gyroscope to explore by moving your phone
+                {hasSeenGyroPrompt
+                  ? "Try gyroscope"
+                  : "Enable gyroscope to explore by moving your phone"}
               </span>
               <button
                 onClick={handleEnableFromPrompt}
@@ -133,6 +158,14 @@ export default function ViewerControls({
               >
                 Enable
               </button>
+              {!hasSeenGyroPrompt && (
+                <button
+                  onClick={handleDismissPrompt}
+                  className="text-xs text-white/70 hover:text-white"
+                >
+                  Later
+                </button>
+              )}
             </div>
           )}
 

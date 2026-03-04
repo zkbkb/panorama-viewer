@@ -8,6 +8,8 @@ const LERP_FACTOR = 0.1;
 const MIN_FOV = 30;
 const MAX_FOV = 110;
 const DEFAULT_FOV = 75;
+const INERTIA_DECAY = 0.92;
+const INERTIA_MIN_SPEED = 0.01;
 
 interface UsePanoramaRendererOptions {
   containerRef: RefObject<HTMLDivElement | null>;
@@ -46,6 +48,12 @@ export function usePanoramaRenderer({
   const pointerStartRef = useRef({ x: 0, y: 0 });
   const dragStartLonRef = useRef(0);
   const dragStartLatRef = useRef(0);
+  const lastPointerRef = useRef({ x: 0, y: 0 });
+
+  // Inertial motion
+  const velocityLonRef = useRef(0);
+  const velocityLatRef = useRef(0);
+  const inertiaActiveRef = useRef(false);
 
   // Pinch state
   const pointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
@@ -148,6 +156,10 @@ export function usePanoramaRenderer({
       if (pointersRef.current.size === 1) {
         isDraggingRef.current = true;
         pointerStartRef.current = { x: e.clientX, y: e.clientY };
+        lastPointerRef.current = { x: e.clientX, y: e.clientY };
+        inertiaActiveRef.current = false;
+        velocityLonRef.current = 0;
+        velocityLatRef.current = 0;
         if (gyroEnabledRef.current) {
           gyroDragStartOffsetLonRef.current = gyroOffsetLonRef.current;
           gyroDragStartOffsetLatRef.current = gyroOffsetLatRef.current;
@@ -183,30 +195,46 @@ export function usePanoramaRenderer({
           Math.min(MAX_FOV, targetFovRef.current + delta * 0.08)
         );
         lastPinchDistRef.current = dist;
+        velocityLonRef.current = 0;
+        velocityLatRef.current = 0;
+        inertiaActiveRef.current = false;
         return;
       }
 
       if (isDraggingRef.current && pointersRef.current.size === 1) {
+        const cameraAspect = camera.aspect || 1;
+        const verticalFov = targetFovRef.current;
+        const horizontalFov =
+          2 *
+          Math.atan(Math.tan((verticalFov * DEG2RAD) / 2) * cameraAspect) /
+          DEG2RAD;
+        const degreesPerPixelX = horizontalFov / Math.max(1, canvas.clientWidth);
+        const degreesPerPixelY = verticalFov / Math.max(1, canvas.clientHeight);
+
         const deltaX =
-          (pointerStartRef.current.x - e.clientX) * 0.15;
+          (lastPointerRef.current.x - e.clientX) * degreesPerPixelX;
         const deltaY =
-          (e.clientY - pointerStartRef.current.y) * 0.15;
+          (e.clientY - lastPointerRef.current.y) * degreesPerPixelY;
+
+        lastPointerRef.current = { x: e.clientX, y: e.clientY };
+
+        velocityLonRef.current = velocityLonRef.current * 0.6 + deltaX * 0.4;
+        velocityLatRef.current = velocityLatRef.current * 0.6 + deltaY * 0.4;
 
         if (gyroEnabledRef.current) {
-          gyroOffsetLonRef.current =
-            gyroDragStartOffsetLonRef.current + deltaX;
+          gyroOffsetLonRef.current -= deltaX;
           gyroOffsetLatRef.current = Math.max(
             -85,
             Math.min(
               85,
-              gyroDragStartOffsetLatRef.current + deltaY
+              gyroOffsetLatRef.current + deltaY
             )
           );
         } else {
-          targetLonRef.current = dragStartLonRef.current + deltaX;
+          targetLonRef.current += deltaX;
           targetLatRef.current = Math.max(
             -85,
-            Math.min(85, dragStartLatRef.current + deltaY)
+            Math.min(85, targetLatRef.current + deltaY)
           );
         }
       }
@@ -217,12 +245,17 @@ export function usePanoramaRenderer({
       pointersRef.current.delete(e.pointerId);
       if (pointersRef.current.size === 0) {
         isDraggingRef.current = false;
+        const hasMomentum =
+          Math.abs(velocityLonRef.current) > INERTIA_MIN_SPEED ||
+          Math.abs(velocityLatRef.current) > INERTIA_MIN_SPEED;
+        inertiaActiveRef.current = hasMomentum;
         canvas.style.cursor = "grab";
       } else if (pointersRef.current.size === 1) {
         // Transitioning from pinch back to single-finger drag:
         // reset start position so the next pointermove doesn't jump
         const remaining = Array.from(pointersRef.current.values())[0];
         pointerStartRef.current = { x: remaining.x, y: remaining.y };
+        lastPointerRef.current = { x: remaining.x, y: remaining.y };
         if (gyroEnabledRef.current) {
           gyroDragStartOffsetLonRef.current = gyroOffsetLonRef.current;
           gyroDragStartOffsetLatRef.current = gyroOffsetLatRef.current;
@@ -367,6 +400,24 @@ export function usePanoramaRenderer({
           }
         }
       } else {
+        if (!isDraggingRef.current && inertiaActiveRef.current) {
+          targetLonRef.current += velocityLonRef.current;
+          targetLatRef.current = Math.max(
+            -85,
+            Math.min(85, targetLatRef.current + velocityLatRef.current)
+          );
+
+          velocityLonRef.current *= INERTIA_DECAY;
+          velocityLatRef.current *= INERTIA_DECAY;
+
+          if (
+            Math.abs(velocityLonRef.current) < INERTIA_MIN_SPEED &&
+            Math.abs(velocityLatRef.current) < INERTIA_MIN_SPEED
+          ) {
+            inertiaActiveRef.current = false;
+          }
+        }
+
         // Smooth interpolation for manual controls
         lonRef.current += (targetLonRef.current - lonRef.current) * LERP_FACTOR;
         latRef.current += (targetLatRef.current - latRef.current) * LERP_FACTOR;
