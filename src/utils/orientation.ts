@@ -27,7 +27,6 @@ export function setQuaternionFromOrientation(
   quaternion.multiply(_q1);
 
   // Screen orientation correction (portrait/landscape rotation around Z)
-  _q2.setFromAxisAngle(_q0.set(0, 0, 1, 0), -screenOrientation);
   _q2.set(0, 0, -Math.sin(screenOrientation / 2), Math.cos(screenOrientation / 2));
   quaternion.multiply(_q2);
 }
