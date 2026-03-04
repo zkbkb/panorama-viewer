@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface UploadScreenProps {
   onImageSelect: (file: File) => void;
@@ -8,13 +8,21 @@ export default function UploadScreen({ onImageSelect }: UploadScreenProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [aspectWarning, setAspectWarning] = useState<{ file: File } | null>(null);
+  const validationIdRef = useRef(0);
+
+  // Cancel any pending validation on unmount
+  useEffect(() => {
+    return () => { validationIdRef.current++; };
+  }, []);
 
   const validateAndSelect = useCallback(
     (file: File) => {
+      const id = ++validationIdRef.current;
       const img = new Image();
       const url = URL.createObjectURL(file);
       img.onload = () => {
         URL.revokeObjectURL(url);
+        if (id !== validationIdRef.current) return; // stale
         const ratio = img.width / img.height;
         if (ratio < 1.8 || ratio > 2.2) {
           setAspectWarning({ file });
@@ -24,7 +32,8 @@ export default function UploadScreen({ onImageSelect }: UploadScreenProps) {
       };
       img.onerror = () => {
         URL.revokeObjectURL(url);
-        onImageSelect(file); // Let the renderer handle the error
+        if (id !== validationIdRef.current) return; // stale
+        onImageSelect(file);
       };
       img.src = url;
     },

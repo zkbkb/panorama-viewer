@@ -351,6 +351,12 @@ export function usePanoramaRenderer({
     const onKeyUp = (e: KeyboardEvent) => {
       pressedKeysRef.current.delete(e.key);
     };
+    const onBlur = () => {
+      pressedKeysRef.current.clear();
+    };
+    const onVisibilityChange = () => {
+      if (document.hidden) pressedKeysRef.current.clear();
+    };
 
     canvas.addEventListener("pointerdown", onPointerDown);
     canvas.addEventListener("pointermove", onPointerMove);
@@ -360,6 +366,8 @@ export function usePanoramaRenderer({
     canvas.addEventListener("contextmenu", onContextMenu);
     canvas.addEventListener("keydown", onKeyDown);
     canvas.addEventListener("keyup", onKeyUp);
+    window.addEventListener("blur", onBlur);
+    document.addEventListener("visibilitychange", onVisibilityChange);
 
     // Resize handler
     const onResize = () => {
@@ -401,11 +409,12 @@ export function usePanoramaRenderer({
         camera.updateProjectionMatrix();
       }
 
-      // Keyboard navigation
+      // Keyboard navigation (dt-based for framerate independence)
       const keys = pressedKeysRef.current;
       if (keys.size > 0 && !gyroEnabledRef.current) {
         const fovScale = fovRef.current / DEFAULT_FOV;
-        const speed = KEYBOARD_PAN_SPEED * fovScale;
+        const speed = KEYBOARD_PAN_SPEED * fovScale * (dt / 16);
+        const zoomSpeed = dt / 16;
         if (keys.has("ArrowLeft") || keys.has("a")) targetLonRef.current -= speed;
         if (keys.has("ArrowRight") || keys.has("d")) targetLonRef.current += speed;
         if (keys.has("ArrowUp") || keys.has("w"))
@@ -413,9 +422,9 @@ export function usePanoramaRenderer({
         if (keys.has("ArrowDown") || keys.has("s"))
           targetLatRef.current = Math.max(-MAX_LATITUDE, targetLatRef.current - speed);
         if (keys.has("=") || keys.has("+"))
-          targetFovRef.current = Math.max(MIN_FOV, targetFovRef.current - 1);
+          targetFovRef.current = Math.max(MIN_FOV, targetFovRef.current - zoomSpeed);
         if (keys.has("-"))
-          targetFovRef.current = Math.min(MAX_FOV, targetFovRef.current + 1);
+          targetFovRef.current = Math.min(MAX_FOV, targetFovRef.current + zoomSpeed);
       }
 
       // Detect gyro toggle: when disabled, extract current view as lon/lat
@@ -579,6 +588,8 @@ export function usePanoramaRenderer({
       canvas.removeEventListener("contextmenu", onContextMenu);
       canvas.removeEventListener("keydown", onKeyDown);
       canvas.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("blur", onBlur);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       window.removeEventListener("resize", onResize);
       document.removeEventListener("fullscreenchange", onResize);
 
