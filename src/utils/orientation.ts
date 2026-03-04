@@ -1,7 +1,6 @@
 import * as THREE from "three";
 
 const _euler = new THREE.Euler();
-const _q0 = new THREE.Quaternion();
 // Rotation to remap device coordinate system: screen Y-up to world Z-up
 const _q1 = new THREE.Quaternion(-Math.sqrt(0.5), 0, 0, Math.sqrt(0.5));
 const _q2 = new THREE.Quaternion();
