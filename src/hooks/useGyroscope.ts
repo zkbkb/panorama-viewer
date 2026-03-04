@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { isMobile } from "../utils/device";
 
 export interface GyroscopeOrientation {
   alpha: number;
@@ -7,7 +8,10 @@ export interface GyroscopeOrientation {
 }
 
 export function useGyroscope() {
-  const [isAvailable] = useState(() => !!window.DeviceOrientationEvent);
+  // Only consider gyroscope available on mobile devices with the API present
+  const [isAvailable, setIsAvailable] = useState(
+    () => isMobile && !!window.DeviceOrientationEvent
+  );
   const [isEnabled, setIsEnabled] = useState(false);
   const orientationRef = useRef<GyroscopeOrientation | null>(null);
   const initialAlphaRef = useRef<number | null>(null);
@@ -15,6 +19,9 @@ export function useGyroscope() {
 
   const handleOrientation = useCallback((event: DeviceOrientationEvent) => {
     if (event.alpha === null) return;
+
+    // Confirm hardware is actually available on first real event
+    setIsAvailable(true);
 
     if (initialAlphaRef.current === null) {
       initialAlphaRef.current = event.alpha;

@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
 import HintToast from "./HintToast";
-
-const isMobile =
-  typeof navigator !== "undefined" && /Mobi|Android/i.test(navigator.userAgent);
+import { isMobile } from "../utils/device";
 
 interface ViewerControlsProps {
   onBack: () => void;
@@ -42,9 +40,13 @@ export default function ViewerControls({
     return () => clearTimeout(timer);
   }, [showGyroPrompt]);
 
+  const handleGyroToggle = () => {
+    Promise.resolve(onToggleGyro()).catch(console.error);
+  };
+
   const handleEnableFromPrompt = () => {
     setShowGyroPrompt(false);
-    Promise.resolve(onToggleGyro()).catch(console.error);
+    handleGyroToggle();
   };
 
   const btnClass =
@@ -71,8 +73,8 @@ export default function ViewerControls({
           </svg>
         </button>
 
-        {/* Fullscreen button — desktop only */}
-        {!isMobile && (
+        {/* Fullscreen button — show when browser supports fullscreen */}
+        {document.fullscreenEnabled && (
           <button
             onClick={onToggleFullscreen}
             className={btnClass}
@@ -192,7 +194,7 @@ export default function ViewerControls({
 
             {/* Gyro toggle button */}
             <button
-              onClick={() => Promise.resolve(onToggleGyro()).catch(console.error)}
+              onClick={handleGyroToggle}
               className={`pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-sm transition-colors ${
                 gyroEnabled
                   ? "bg-white/90 text-black"

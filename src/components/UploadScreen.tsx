@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface UploadScreenProps {
   onImageSelect: (file: File) => void;
@@ -7,14 +7,46 @@ interface UploadScreenProps {
 export default function UploadScreen({ onImageSelect }: UploadScreenProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [aspectWarning, setAspectWarning] = useState<{ file: File } | null>(null);
+  const validationIdRef = useRef(0);
+
+  // Cancel any pending validation on unmount
+  useEffect(() => {
+    return () => { validationIdRef.current++; };
+  }, []);
+
+  const validateAndSelect = useCallback(
+    (file: File) => {
+      const id = ++validationIdRef.current;
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        if (id !== validationIdRef.current) return; // stale
+        const ratio = img.width / img.height;
+        if (ratio < 1.8 || ratio > 2.2) {
+          setAspectWarning({ file });
+        } else {
+          onImageSelect(file);
+        }
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        if (id !== validationIdRef.current) return; // stale
+        onImageSelect(file);
+      };
+      img.src = url;
+    },
+    [onImageSelect]
+  );
 
   const handleFile = useCallback(
     (file: File) => {
       if (file.type.startsWith("image/")) {
-        onImageSelect(file);
+        validateAndSelect(file);
       }
     },
-    [onImageSelect]
+    [validateAndSelect]
   );
 
   const handleFileChange = useCallback(
@@ -122,6 +154,50 @@ export default function UploadScreen({ onImageSelect }: UploadScreenProps) {
           onChange={handleFileChange}
           className="hidden"
         />
+
+        {/* Aspect ratio warning dialog */}
+        {aspectWarning && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+            <div className="mx-4 max-w-sm rounded-2xl bg-zinc-900 p-6 text-center">
+              <svg
+                className="mx-auto mb-3 h-10 w-10 text-yellow-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={1.5}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
+                />
+              </svg>
+              <p className="mb-1 text-sm font-medium text-white">
+                Non-standard aspect ratio
+              </p>
+              <p className="mb-5 text-xs text-zinc-400">
+                This image doesn't appear to be an equirectangular panorama (expected 2:1 ratio). It may appear distorted.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setAspectWarning(null)}
+                  className="flex-1 rounded-full bg-zinc-800 px-4 py-2 text-sm text-zinc-300 transition-colors hover:bg-zinc-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    onImageSelect(aspectWarning.file);
+                    setAspectWarning(null);
+                  }}
+                  className="flex-1 rounded-full bg-violet-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-violet-400"
+                >
+                  Continue anyway
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Social links */}
         <div className="mt-8 flex items-center justify-center gap-4">
