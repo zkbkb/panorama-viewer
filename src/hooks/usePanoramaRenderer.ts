@@ -300,7 +300,13 @@ export function usePanoramaRenderer({
       if (pointersRef.current.size === 0) {
         isDraggingRef.current = false;
         canvas.style.cursor = "grab";
-        // Inertia: velocity is already set from last pointermove
+        // Only apply inertia if the finger was still moving at release (flick gesture).
+        // If the user paused before lifting, discard velocity.
+        const timeSinceLastMove = performance.now() - lastPointerTimeRef.current;
+        if (timeSinceLastMove > 80) {
+          velocityLonRef.current = 0;
+          velocityLatRef.current = 0;
+        }
       } else if (pointersRef.current.size === 1) {
         // Transitioning from pinch back to single-finger drag:
         // reset start position so the next pointermove doesn't jump
