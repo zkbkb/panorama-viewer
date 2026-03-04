@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { isMobile } from "../utils/device";
 
 interface HintToastProps {
   gyroEnabled: boolean;
@@ -7,15 +8,12 @@ interface HintToastProps {
 export default function HintToast({
   gyroEnabled,
 }: HintToastProps) {
-  const [visible, setVisible] = useState(true);
+  const [fading, setFading] = useState(false);
 
   useEffect(() => {
-    const timer = setTimeout(() => setVisible(false), 4000);
+    const timer = setTimeout(() => setFading(true), 4000);
     return () => clearTimeout(timer);
   }, []);
-
-  const isMobile =
-    typeof navigator !== "undefined" && /Mobi|Android/i.test(navigator.userAgent);
 
   let text: string;
   if (gyroEnabled) {
@@ -26,10 +24,8 @@ export default function HintToast({
     text = "Drag to look around \u00B7 Scroll to zoom";
   }
 
-  if (!visible) return null;
-
   return (
-    <div className="pointer-events-none transition-opacity duration-700">
+    <div className={`pointer-events-none transition-opacity duration-700 ${fading ? "opacity-0" : "opacity-100"}`}>
       <div className="rounded-full bg-black/60 px-5 py-2.5 text-sm text-white/90 backdrop-blur-sm">
         {text}
       </div>

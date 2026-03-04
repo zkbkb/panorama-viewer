@@ -8,6 +8,17 @@ const LERP_FACTOR = 0.1;
 const MIN_FOV = 30;
 const MAX_FOV = 110;
 const DEFAULT_FOV = 75;
+const PINCH_SENSITIVITY = 0.08;
+const WHEEL_SENSITIVITY = 0.05;
+const SPHERE_RADIUS = 500;
+const SPHERE_WIDTH_SEGMENTS = 64;
+const SPHERE_HEIGHT_SEGMENTS = 32;
+const MAX_LATITUDE = 85;
+const FRICTION = 0.95;
+const INERTIA_THRESHOLD = 0.001;
+const DOUBLE_TAP_INTERVAL = 300;
+const DOUBLE_TAP_DISTANCE = 30;
+const KEYBOARD_PAN_SPEED = 2; // degrees per frame at default FOV
 
 interface UsePanoramaRendererOptions {
   containerRef: RefObject<HTMLDivElement | null>;
@@ -25,6 +36,7 @@ export function usePanoramaRenderer({
   orientationRef,
 }: UsePanoramaRendererOptions) {
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
@@ -50,6 +62,21 @@ export function usePanoramaRenderer({
   // Pinch state
   const pointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
   const lastPinchDistRef = useRef(0);
+
+  // Inertia state
+  const velocityLonRef = useRef(0);
+  const velocityLatRef = useRef(0);
+  const lastPointerTimeRef = useRef(0);
+  const lastPointerXRef = useRef(0);
+  const lastPointerYRef = useRef(0);
+
+  // Double-tap state
+  const lastTapTimeRef = useRef(0);
+  const lastTapXRef = useRef(0);
+  const lastTapYRef = useRef(0);
+
+  // Keyboard state
+  const pressedKeysRef = useRef<Set<string>>(new Set());
 
   // Gyro touch offset
   const gyroOffsetLonRef = useRef(0);
@@ -107,7 +134,7 @@ export function usePanoramaRenderer({
     cameraRef.current = camera;
 
     // Capture default orientation (lon=0, lat=0 → looking at +X)
-    camera.lookAt(500, 0, 0);
+    camera.lookAt(SPHERE_RADIUS, 0, 0);
     defaultCameraQRef.current.copy(camera.quaternion);
 
     // Scene
@@ -115,7 +142,11 @@ export function usePanoramaRenderer({
     sceneRef.current = scene;
 
     // Sphere geometry (inverted)
-    const geometry = new THREE.SphereGeometry(500, 64, 32);
+    const geometry = new THREE.SphereGeometry(
+      SPHERE_RADIUS,
+      SPHERE_WIDTH_SEGMENTS,
+      SPHERE_HEIGHT_SEGMENTS
+    );
     geometry.scale(-1, 1, 1);
 
     // Material
@@ -138,6 +169,20 @@ export function usePanoramaRenderer({
     const canvas = renderer.domElement;
     canvas.style.touchAction = "none";
     canvas.style.cursor = "grab";
+    // Make canvas focusable for keyboard events
+    canvas.tabIndex = 0;
+    canvas.style.outline = "none";
+
+    // --- Helper: compute degrees-per-pixel for 1:1 "跟手" drag mapping ---
+    const getDegreesPerPixel = () => {
+      const vFov = fovRef.current;
+      const w = container.clientWidth;
+      const h = container.clientHeight;
+      return {
+        x: (vFov * (w / h)) / w,
+        y: vFov / h,
+      };
+    };
 
     // --- Event Handlers ---
 
@@ -146,8 +191,34 @@ export function usePanoramaRenderer({
       pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
       if (pointersRef.current.size === 1) {
+        // Double-tap detection
+        const now = performance.now();
+        const dx = e.clientX - lastTapXRef.current;
+        const dy = e.clientY - lastTapYRef.current;
+        const dist = Math.hypot(dx, dy);
+        if (
+          now - lastTapTimeRef.current < DOUBLE_TAP_INTERVAL &&
+          dist < DOUBLE_TAP_DISTANCE
+        ) {
+          // Double-tap: toggle zoom
+          targetFovRef.current =
+            targetFovRef.current < DEFAULT_FOV - 5 ? DEFAULT_FOV : MIN_FOV;
+          lastTapTimeRef.current = 0; // reset to prevent triple-tap
+        } else {
+          lastTapTimeRef.current = now;
+        }
+        lastTapXRef.current = e.clientX;
+        lastTapYRef.current = e.clientY;
+
         isDraggingRef.current = true;
         pointerStartRef.current = { x: e.clientX, y: e.clientY };
+        // Stop any inertia on new touch
+        velocityLonRef.current = 0;
+        velocityLatRef.current = 0;
+        lastPointerTimeRef.current = performance.now();
+        lastPointerXRef.current = e.clientX;
+        lastPointerYRef.current = e.clientY;
+
         if (gyroEnabledRef.current) {
           gyroDragStartOffsetLonRef.current = gyroOffsetLonRef.current;
           gyroDragStartOffsetLatRef.current = gyroOffsetLatRef.current;
@@ -180,33 +251,44 @@ export function usePanoramaRenderer({
         const delta = lastPinchDistRef.current - dist;
         targetFovRef.current = Math.max(
           MIN_FOV,
-          Math.min(MAX_FOV, targetFovRef.current + delta * 0.08)
+          Math.min(MAX_FOV, targetFovRef.current + delta * PINCH_SENSITIVITY)
         );
         lastPinchDistRef.current = dist;
         return;
       }
 
       if (isDraggingRef.current && pointersRef.current.size === 1) {
-        const deltaX =
-          (pointerStartRef.current.x - e.clientX) * 0.15;
-        const deltaY =
-          (e.clientY - pointerStartRef.current.y) * 0.15;
+        // 1:1 "跟手" mapping: degrees-per-pixel based on current FOV and viewport
+        const dpp = getDegreesPerPixel();
+        const deltaX = (pointerStartRef.current.x - e.clientX) * dpp.x;
+        const deltaY = (e.clientY - pointerStartRef.current.y) * dpp.y;
+
+        // Track velocity for inertia
+        const now = performance.now();
+        const dt = now - lastPointerTimeRef.current;
+        if (dt > 0) {
+          velocityLonRef.current = ((lastPointerXRef.current - e.clientX) * dpp.x) / dt;
+          velocityLatRef.current = ((e.clientY - lastPointerYRef.current) * dpp.y) / dt;
+        }
+        lastPointerTimeRef.current = now;
+        lastPointerXRef.current = e.clientX;
+        lastPointerYRef.current = e.clientY;
 
         if (gyroEnabledRef.current) {
           gyroOffsetLonRef.current =
             gyroDragStartOffsetLonRef.current + deltaX;
           gyroOffsetLatRef.current = Math.max(
-            -85,
+            -MAX_LATITUDE,
             Math.min(
-              85,
+              MAX_LATITUDE,
               gyroDragStartOffsetLatRef.current + deltaY
             )
           );
         } else {
           targetLonRef.current = dragStartLonRef.current + deltaX;
           targetLatRef.current = Math.max(
-            -85,
-            Math.min(85, dragStartLatRef.current + deltaY)
+            -MAX_LATITUDE,
+            Math.min(MAX_LATITUDE, dragStartLatRef.current + deltaY)
           );
         }
       }
@@ -218,6 +300,7 @@ export function usePanoramaRenderer({
       if (pointersRef.current.size === 0) {
         isDraggingRef.current = false;
         canvas.style.cursor = "grab";
+        // Inertia: velocity is already set from last pointermove
       } else if (pointersRef.current.size === 1) {
         // Transitioning from pinch back to single-finger drag:
         // reset start position so the next pointermove doesn't jump
@@ -237,8 +320,17 @@ export function usePanoramaRenderer({
       e.preventDefault();
       targetFovRef.current = Math.max(
         MIN_FOV,
-        Math.min(MAX_FOV, targetFovRef.current + e.deltaY * 0.05)
+        Math.min(MAX_FOV, targetFovRef.current + e.deltaY * WHEEL_SENSITIVITY)
       );
+    };
+
+    const onContextMenu = (e: Event) => e.preventDefault();
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      pressedKeysRef.current.add(e.key);
+    };
+    const onKeyUp = (e: KeyboardEvent) => {
+      pressedKeysRef.current.delete(e.key);
     };
 
     canvas.addEventListener("pointerdown", onPointerDown);
@@ -246,7 +338,9 @@ export function usePanoramaRenderer({
     canvas.addEventListener("pointerup", onPointerUp);
     canvas.addEventListener("pointercancel", onPointerUp);
     canvas.addEventListener("wheel", onWheel, { passive: false });
-    canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+    canvas.addEventListener("contextmenu", onContextMenu);
+    canvas.addEventListener("keydown", onKeyDown);
+    canvas.addEventListener("keyup", onKeyUp);
 
     // Resize handler
     const onResize = () => {
@@ -259,22 +353,43 @@ export function usePanoramaRenderer({
     window.addEventListener("resize", onResize);
     document.addEventListener("fullscreenchange", onResize);
 
-    // Camera target vector (reused each frame)
+    // Pre-allocated objects reused each frame
     const target = new THREE.Vector3();
     const gyroQuaternion = new THREE.Quaternion();
     const inverseInitQ = new THREE.Quaternion();
     const offsetQ = new THREE.Quaternion();
     const offsetEuler = new THREE.Euler();
     const rollCorrectionEuler = new THREE.Euler();
+    const forwardVec = new THREE.Vector3();
 
     // Animation loop
     const animate = () => {
       animFrameRef.current = requestAnimationFrame(animate);
 
-      // Smooth FOV
-      fovRef.current += (targetFovRef.current - fovRef.current) * LERP_FACTOR;
-      camera.fov = fovRef.current;
-      camera.updateProjectionMatrix();
+      // Smooth FOV — only update projection matrix when FOV is actually changing
+      const fovDelta = targetFovRef.current - fovRef.current;
+      if (Math.abs(fovDelta) > 0.01) {
+        fovRef.current += fovDelta * LERP_FACTOR;
+        camera.fov = fovRef.current;
+        camera.updateProjectionMatrix();
+      }
+
+      // Keyboard navigation
+      const keys = pressedKeysRef.current;
+      if (keys.size > 0 && !gyroEnabledRef.current) {
+        const fovScale = fovRef.current / DEFAULT_FOV;
+        const speed = KEYBOARD_PAN_SPEED * fovScale;
+        if (keys.has("ArrowLeft") || keys.has("a")) targetLonRef.current -= speed;
+        if (keys.has("ArrowRight") || keys.has("d")) targetLonRef.current += speed;
+        if (keys.has("ArrowUp") || keys.has("w"))
+          targetLatRef.current = Math.min(MAX_LATITUDE, targetLatRef.current + speed);
+        if (keys.has("ArrowDown") || keys.has("s"))
+          targetLatRef.current = Math.max(-MAX_LATITUDE, targetLatRef.current - speed);
+        if (keys.has("=") || keys.has("+"))
+          targetFovRef.current = Math.max(MIN_FOV, targetFovRef.current - 1);
+        if (keys.has("-"))
+          targetFovRef.current = Math.min(MAX_FOV, targetFovRef.current + 1);
+      }
 
       // Detect gyro toggle: when disabled, extract current view as lon/lat
       if (prevGyroEnabledRef.current && !gyroEnabledRef.current) {
@@ -284,8 +399,8 @@ export function usePanoramaRenderer({
         gyroOffsetLatRef.current = 0;
 
         // Extract camera forward direction → lon/lat for seamless transition
-        const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-        const extractedLat = Math.max(-85, Math.min(85,
+        const fwd = forwardVec.set(0, 0, -1).applyQuaternion(camera.quaternion);
+        const extractedLat = Math.max(-MAX_LATITUDE, Math.min(MAX_LATITUDE,
           Math.asin(Math.max(-1, Math.min(1, fwd.y))) / DEG2RAD
         ));
         const extractedLon = Math.atan2(fwd.z, fwd.x) / DEG2RAD;
@@ -338,7 +453,9 @@ export function usePanoramaRenderer({
 
           // camera = initialCameraQ * offsetQ * inverse(initialGyroQ) * currentGyroQ
           // Touch offset defines the base direction; gyro relative motion is applied on top
-          camera.quaternion.copy(initialCameraQRef.current!);
+          const initCamQ = initialCameraQRef.current;
+          if (!initCamQ) return; // Type guard; logically unreachable after block above
+          camera.quaternion.copy(initCamQ);
 
           // Apply touch offset first (defines which direction in the panorama we face)
           if (
@@ -367,6 +484,23 @@ export function usePanoramaRenderer({
           }
         }
       } else {
+        // Apply inertia when not dragging
+        if (!isDraggingRef.current) {
+          if (Math.abs(velocityLonRef.current) > INERTIA_THRESHOLD ||
+              Math.abs(velocityLatRef.current) > INERTIA_THRESHOLD) {
+            targetLonRef.current += velocityLonRef.current * 16; // ~16ms per frame
+            targetLatRef.current = Math.max(
+              -MAX_LATITUDE,
+              Math.min(MAX_LATITUDE, targetLatRef.current + velocityLatRef.current * 16)
+            );
+            velocityLonRef.current *= FRICTION;
+            velocityLatRef.current *= FRICTION;
+            // Stop when below threshold
+            if (Math.abs(velocityLonRef.current) < INERTIA_THRESHOLD) velocityLonRef.current = 0;
+            if (Math.abs(velocityLatRef.current) < INERTIA_THRESHOLD) velocityLatRef.current = 0;
+          }
+        }
+
         // Smooth interpolation for manual controls
         lonRef.current += (targetLonRef.current - lonRef.current) * LERP_FACTOR;
         latRef.current += (targetLatRef.current - latRef.current) * LERP_FACTOR;
@@ -375,9 +509,9 @@ export function usePanoramaRenderer({
         const theta = lonRef.current * DEG2RAD;
 
         target.set(
-          500 * Math.sin(phi) * Math.cos(theta),
-          500 * Math.cos(phi),
-          500 * Math.sin(phi) * Math.sin(theta)
+          SPHERE_RADIUS * Math.sin(phi) * Math.cos(theta),
+          SPHERE_RADIUS * Math.cos(phi),
+          SPHERE_RADIUS * Math.sin(phi) * Math.sin(theta)
         );
         camera.lookAt(target);
       }
@@ -394,6 +528,9 @@ export function usePanoramaRenderer({
       canvas.removeEventListener("pointerup", onPointerUp);
       canvas.removeEventListener("pointercancel", onPointerUp);
       canvas.removeEventListener("wheel", onWheel);
+      canvas.removeEventListener("contextmenu", onContextMenu);
+      canvas.removeEventListener("keydown", onKeyDown);
+      canvas.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("resize", onResize);
       document.removeEventListener("fullscreenchange", onResize);
 
@@ -413,6 +550,10 @@ export function usePanoramaRenderer({
       materialRef.current = null;
       meshRef.current = null;
     };
+    // The main useEffect intentionally depends only on containerRef. All other state
+    // (gyroEnabled, horizonLocked, orientationRef, imageUrl) is accessed via refs to
+    // avoid tearing down and rebuilding the entire WebGL context on every state change.
+    // Texture loading is handled by a separate useEffect below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [containerRef]);
 
@@ -422,6 +563,7 @@ export function usePanoramaRenderer({
     if (!material) return;
 
     setIsLoading(true);
+    setError(null);
     const loader = new THREE.TextureLoader();
     loader.load(
       imageUrl,
@@ -440,6 +582,7 @@ export function usePanoramaRenderer({
       },
       undefined,
       () => {
+        setError("Failed to load image. The file may be corrupted or too large.");
         setIsLoading(false);
       }
     );
@@ -453,5 +596,5 @@ export function usePanoramaRenderer({
     gyroOffsetLatRef.current = 0;
   }, []);
 
-  return { isLoading, recenter };
+  return { isLoading, error, recenter };
 }
