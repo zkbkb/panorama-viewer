@@ -9,11 +9,7 @@ export interface GyroscopeOrientation {
 export function useGyroscope() {
   const [isAvailable] = useState(() => !!window.DeviceOrientationEvent);
   const [isEnabled, setIsEnabled] = useState(false);
-  const orientationRef = useRef<GyroscopeOrientation>({
-    alpha: 0,
-    beta: 0,
-    gamma: 0,
-  });
+  const orientationRef = useRef<GyroscopeOrientation | null>(null);
   const initialAlphaRef = useRef<number | null>(null);
   const listenerAttachedRef = useRef(false);
 

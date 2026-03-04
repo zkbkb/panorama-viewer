@@ -14,7 +14,7 @@ interface UsePanoramaRendererOptions {
   imageUrl: string;
   gyroEnabled: boolean;
   horizonLocked: boolean;
-  orientationRef: RefObject<GyroscopeOrientation>;
+  orientationRef: RefObject<GyroscopeOrientation | null>;
 }
 
 export function usePanoramaRenderer({
@@ -70,6 +70,7 @@ export function usePanoramaRenderer({
   const prevGyroEnabledRef = useRef(gyroEnabled);
   gyroEnabledRef.current = gyroEnabled;
   const horizonLockedRef = useRef(horizonLocked);
+  const prevHorizonLockedRef = useRef(horizonLocked);
   horizonLockedRef.current = horizonLocked;
 
   // Screen orientation for gyroscope
@@ -309,6 +310,23 @@ export function usePanoramaRenderer({
             orient
           );
           currentGyroQRef.current.copy(gyroQuaternion);
+
+          // Detect horizon lock toggle — recapture reference to avoid view jump
+          if (
+            prevHorizonLockedRef.current !== horizonLockedRef.current &&
+            initialGyroQRef.current
+          ) {
+            // Zero roll on current camera so both transitions are seamless
+            rollCorrectionEuler.setFromQuaternion(camera.quaternion, "YXZ");
+            rollCorrectionEuler.z = 0;
+            camera.quaternion.setFromEuler(rollCorrectionEuler);
+            // Recapture from corrected camera + current gyro
+            initialGyroQRef.current = gyroQuaternion.clone();
+            initialCameraQRef.current = camera.quaternion.clone();
+            gyroOffsetLonRef.current = 0;
+            gyroOffsetLatRef.current = 0;
+          }
+          prevHorizonLockedRef.current = horizonLockedRef.current;
 
           // On first gyro frame, capture reference quaternions
           if (!initialGyroQRef.current) {

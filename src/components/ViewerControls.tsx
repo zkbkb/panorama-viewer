@@ -184,18 +184,8 @@ export default function ViewerControls({
                   stroke="currentColor"
                   strokeWidth={2}
                 >
-                  <path
-                    strokeLinecap="round"
-                    d="M3 12h18"
-                  />
-                  <path
-                    strokeLinecap="round"
-                    d="M7 8l-4 4 4 4"
-                  />
-                  <path
-                    strokeLinecap="round"
-                    d="M17 8l4 4-4 4"
-                  />
+                  <rect x="3" y="9" width="18" height="6" rx="3" strokeLinecap="round" strokeLinejoin="round" />
+                  <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
                 </svg>
               </button>
             )}
@@ -217,11 +207,9 @@ export default function ViewerControls({
                 stroke="currentColor"
                 strokeWidth={2}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3"
-                />
+                <circle cx="12" cy="12" r="9" strokeLinecap="round" />
+                <ellipse cx="12" cy="12" rx="9" ry="3.5" transform="rotate(60 12 12)" strokeLinecap="round" />
+                <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
               </svg>
             </button>
           </div>
