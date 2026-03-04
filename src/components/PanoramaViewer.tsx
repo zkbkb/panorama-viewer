@@ -18,7 +18,7 @@ export default function PanoramaViewer({
   const gyro = useGyroscope();
   const { isFullscreen, toggleFullscreen } = useFullscreen();
 
-  const { isLoading } = usePanoramaRenderer({
+  const { isLoading, recenter } = usePanoramaRenderer({
     containerRef,
     imageUrl,
     gyroEnabled: gyro.isEnabled,
@@ -56,6 +56,7 @@ export default function PanoramaViewer({
         gyroAvailable={gyro.isAvailable}
         gyroEnabled={gyro.isEnabled}
         onToggleGyro={handleToggleGyro}
+        onRecenter={recenter}
       />
 
       {/* Hint toast */}
