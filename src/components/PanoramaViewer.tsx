@@ -3,7 +3,6 @@ import { usePanoramaRenderer } from "../hooks/usePanoramaRenderer";
 import { useGyroscope } from "../hooks/useGyroscope";
 import { useFullscreen } from "../hooks/useFullscreen";
 import ViewerControls from "./ViewerControls";
-import HintToast from "./HintToast";
 
 interface PanoramaViewerProps {
   imageUrl: string;
@@ -57,12 +56,6 @@ export default function PanoramaViewer({
         gyroEnabled={gyro.isEnabled}
         onToggleGyro={handleToggleGyro}
         onRecenter={recenter}
-      />
-
-      {/* Hint toast */}
-      <HintToast
-        key={String(gyro.isEnabled)}
-        gyroEnabled={gyro.isEnabled}
       />
     </div>
   );

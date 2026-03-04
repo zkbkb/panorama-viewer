@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import HintToast from "./HintToast";
 
 const isMobile =
   typeof navigator !== "undefined" && /Mobi|Android/i.test(navigator.userAgent);
@@ -106,17 +107,71 @@ export default function ViewerControls({
         )}
       </div>
 
-      {/* Bottom right: Gyro + Recenter buttons */}
-      {gyroAvailable && (
-        <div className="absolute bottom-4 right-3 flex flex-col items-center gap-2">
-          {/* Recenter button — only when gyro is active */}
-          {gyroEnabled && (
+      {/* Bottom bar — safe-area aware, flex layout prevents overlap */}
+      <div
+        className="absolute bottom-0 inset-x-0 flex items-end p-3"
+        style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom, 0px))" }}
+      >
+        {/* Left spacer to balance center content */}
+        <div className="w-11 shrink-0" />
+
+        {/* Center: stacked messages */}
+        <div className="flex min-w-0 flex-1 flex-col items-center gap-2">
+          {/* Gyro discovery prompt */}
+          {gyroPromptVisible && (
+            <div className="pointer-events-auto flex items-center gap-3 rounded-2xl bg-black/70 px-4 py-3 backdrop-blur-sm">
+              <span className="text-sm text-white/90">
+                Enable gyroscope to explore by moving your phone
+              </span>
+              <button
+                onClick={handleEnableFromPrompt}
+                className="shrink-0 rounded-full bg-violet-500 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-violet-400"
+              >
+                Enable
+              </button>
+            </div>
+          )}
+
+          {/* Hint toast */}
+          <HintToast key={String(gyroEnabled)} gyroEnabled={gyroEnabled} />
+        </div>
+
+        {/* Right: Gyro + Recenter buttons */}
+        {gyroAvailable ? (
+          <div className="flex shrink-0 flex-col items-center gap-2">
+            {/* Recenter button — only when gyro is active */}
+            {gyroEnabled && (
+              <button
+                onClick={onRecenter}
+                className={btnClass}
+                title="Recenter view"
+              >
+                <svg
+                  className="h-5 w-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <circle cx="12" cy="12" r="3" />
+                  <path
+                    strokeLinecap="round"
+                    d="M12 2v4m0 12v4M2 12h4m12 0h4"
+                  />
+                </svg>
+              </button>
+            )}
+
+            {/* Gyro toggle button */}
             <button
-              onClick={onRecenter}
-              className={btnClass}
-              title="Recenter view"
+              onClick={onToggleGyro}
+              className={`pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-sm transition-colors ${
+                gyroEnabled
+                  ? "bg-violet-500/80 text-white"
+                  : "bg-black/50 text-white hover:bg-black/70"
+              }`}
+              title={gyroEnabled ? "Disable gyroscope" : "Enable gyroscope"}
             >
-              {/* Crosshair / compass icon */}
               <svg
                 className="h-5 w-5"
                 fill="none"
@@ -124,58 +179,18 @@ export default function ViewerControls({
                 stroke="currentColor"
                 strokeWidth={2}
               >
-                <circle cx="12" cy="12" r="3" />
                 <path
                   strokeLinecap="round"
-                  d="M12 2v4m0 12v4M2 12h4m12 0h4"
+                  strokeLinejoin="round"
+                  d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3"
                 />
               </svg>
             </button>
-          )}
-
-          {/* Gyro toggle button */}
-          <button
-            onClick={onToggleGyro}
-            className={`pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-sm transition-colors ${
-              gyroEnabled
-                ? "bg-violet-500/80 text-white"
-                : "bg-black/50 text-white hover:bg-black/70"
-            }`}
-            title={gyroEnabled ? "Disable gyroscope" : "Enable gyroscope"}
-          >
-            <svg
-              className="h-5 w-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3"
-              />
-            </svg>
-          </button>
-        </div>
-      )}
-
-      {/* Gyro discovery prompt */}
-      {gyroPromptVisible && (
-        <div className="absolute bottom-20 left-1/2 -translate-x-1/2">
-          <div className="pointer-events-auto flex items-center gap-3 rounded-2xl bg-black/70 px-4 py-3 backdrop-blur-sm">
-            <span className="text-sm text-white/90">
-              Enable gyroscope to explore by moving your phone
-            </span>
-            <button
-              onClick={handleEnableFromPrompt}
-              className="shrink-0 rounded-full bg-violet-500 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-violet-400"
-            >
-              Enable
-            </button>
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="w-11 shrink-0" />
+        )}
+      </div>
     </div>
   );
 }
