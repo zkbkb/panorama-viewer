@@ -216,11 +216,6 @@ export function usePanoramaRenderer({
         const deltaY =
           (e.clientY - lastPointerRef.current.y) * degreesPerPixelY;
 
-        lastPointerRef.current = { x: e.clientX, y: e.clientY };
-
-        velocityLonRef.current = velocityLonRef.current * 0.6 + deltaX * 0.4;
-        velocityLatRef.current = velocityLatRef.current * 0.6 + deltaY * 0.4;
-
         if (gyroEnabledRef.current) {
           gyroOffsetLonRef.current += deltaX;
           gyroOffsetLatRef.current = Math.max(
@@ -231,10 +226,10 @@ export function usePanoramaRenderer({
             )
           );
         } else {
-          targetLonRef.current -= deltaX;
+          targetLonRef.current += deltaX;
           targetLatRef.current = Math.max(
             -85,
-            Math.min(85, targetLatRef.current + deltaY)
+            Math.min(85, targetLatRef.current - deltaY)
           );
         }
       }
