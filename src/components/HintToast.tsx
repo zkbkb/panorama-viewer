@@ -8,19 +8,11 @@ export default function HintToast({
   gyroEnabled,
 }: HintToastProps) {
   const [visible, setVisible] = useState(true);
-  const [prevGyro, setPrevGyro] = useState(gyroEnabled);
-
-  // Reset visibility when gyroEnabled changes (React-recommended pattern)
-  if (prevGyro !== gyroEnabled) {
-    setPrevGyro(gyroEnabled);
-    setVisible(true);
-  }
 
   useEffect(() => {
-    if (!visible) return;
     const timer = setTimeout(() => setVisible(false), 4000);
     return () => clearTimeout(timer);
-  }, [visible]);
+  }, []);
 
   const isMobile =
     typeof navigator !== "undefined" && /Mobi|Android/i.test(navigator.userAgent);

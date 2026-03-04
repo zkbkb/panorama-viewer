@@ -60,6 +60,7 @@ export default function PanoramaViewer({
 
       {/* Hint toast */}
       <HintToast
+        key={String(gyro.isEnabled)}
         gyroEnabled={gyro.isEnabled}
       />
     </div>
