@@ -1,6 +1,6 @@
 # 360° Panorama Viewer
 
-[![Cloudflare](https://img.shields.io/website?url=https%3A%2F%2Fpanorama-view.pages.dev&up_message=live&down_message=error&label=Cloudflare&logo=cloudflare&logoColor=white&color=F38020)](https://panorama-view.pages.dev)
+[![Cloudflare](https://img.shields.io/website?url=https%3A%2F%2Fpanorama-view.pages.dev&up_message=live&down_message=error&label=Cloudflare&logo=cloudflare&logoColor=F38020&labelColor=white)](https://panorama-view.pages.dev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-brightgreen.svg)](./LICENSE)
 
 A mobile-first web application for viewing equirectangular panorama images in immersive 360°. Upload a panorama photo, explore it by dragging or using your phone's gyroscope.
