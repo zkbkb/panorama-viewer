@@ -14,8 +14,10 @@ const SPHERE_RADIUS = 500;
 const SPHERE_WIDTH_SEGMENTS = 64;
 const SPHERE_HEIGHT_SEGMENTS = 32;
 const MAX_LATITUDE = 85;
-const FRICTION = 0.95;
+const FRICTION = 0.97;
 const INERTIA_THRESHOLD = 0.001;
+const VELOCITY_SMOOTHING = 0.3; // EMA weight for new velocity samples
+const RECENTER_DURATION_MS = 500;
 const DOUBLE_TAP_INTERVAL = 300;
 const DOUBLE_TAP_DISTANCE = 30;
 const KEYBOARD_PAN_SPEED = 2; // degrees per frame at default FOV
@@ -95,6 +97,7 @@ export function usePanoramaRenderer({
   // Recenter animation state
   const recenterFromQRef = useRef(new THREE.Quaternion());
   const recenterProgressRef = useRef(1); // 1 = no animation, <1 = animating
+  const recenterStartTimeRef = useRef(0);
 
   // Refs for animation loop (avoid stale closures)
   const gyroEnabledRef = useRef(gyroEnabled);
@@ -271,12 +274,14 @@ export function usePanoramaRenderer({
         const deltaX = (pointerStartRef.current.x - e.clientX) * dpp.x;
         const deltaY = (e.clientY - pointerStartRef.current.y) * dpp.y;
 
-        // Track velocity for inertia
+        // Track velocity for inertia (exponential moving average to avoid spikes)
         const now = performance.now();
         const dt = now - lastPointerTimeRef.current;
         if (dt > 0) {
-          velocityLonRef.current = ((lastPointerXRef.current - e.clientX) * dpp.x) / dt;
-          velocityLatRef.current = ((e.clientY - lastPointerYRef.current) * dpp.y) / dt;
+          const newVelLon = ((lastPointerXRef.current - e.clientX) * dpp.x) / dt;
+          const newVelLat = ((e.clientY - lastPointerYRef.current) * dpp.y) / dt;
+          velocityLonRef.current += (newVelLon - velocityLonRef.current) * VELOCITY_SMOOTHING;
+          velocityLatRef.current += (newVelLat - velocityLatRef.current) * VELOCITY_SMOOTHING;
         }
         lastPointerTimeRef.current = now;
         lastPointerXRef.current = e.clientX;
@@ -367,6 +372,9 @@ export function usePanoramaRenderer({
     window.addEventListener("resize", onResize);
     document.addEventListener("fullscreenchange", onResize);
 
+    // Frame timing for delta-time-based physics
+    let lastFrameTime = performance.now();
+
     // Pre-allocated objects reused each frame
     const target = new THREE.Vector3();
     const gyroQuaternion = new THREE.Quaternion();
@@ -380,6 +388,10 @@ export function usePanoramaRenderer({
     // Animation loop
     const animate = () => {
       animFrameRef.current = requestAnimationFrame(animate);
+
+      const now = performance.now();
+      const dt = Math.min(now - lastFrameTime, 32); // cap to avoid huge jumps
+      lastFrameTime = now;
 
       // Smooth FOV — only update projection matrix when FOV is actually changing
       const fovDelta = targetFovRef.current - fovRef.current;
@@ -498,11 +510,12 @@ export function usePanoramaRenderer({
             camera.quaternion.setFromEuler(rollCorrectionEuler);
           }
 
-          // Smooth recenter animation: SLERP from captured orientation to target
+          // Smooth recenter animation: time-based SLERP
           if (recenterProgressRef.current < 1) {
-            recenterProgressRef.current = Math.min(1, recenterProgressRef.current + 0.06);
-            // Ease-out curve for natural deceleration
-            const t = 1 - Math.pow(1 - recenterProgressRef.current, 3);
+            const elapsed = now - recenterStartTimeRef.current;
+            recenterProgressRef.current = Math.min(1, elapsed / RECENTER_DURATION_MS);
+            // Quintic ease-out for a silky deceleration curve
+            const t = 1 - Math.pow(1 - recenterProgressRef.current, 4);
             // Copy target first to avoid self-aliasing (slerpQuaternions
             // internally does this.copy(qa) which would destroy qb if qb === this)
             recenterTargetQ.copy(camera.quaternion);
@@ -510,29 +523,32 @@ export function usePanoramaRenderer({
           }
         }
       } else {
-        // Apply inertia when not dragging
-        if (!isDraggingRef.current) {
-          if (Math.abs(velocityLonRef.current) > INERTIA_THRESHOLD ||
-              Math.abs(velocityLatRef.current) > INERTIA_THRESHOLD) {
-            targetLonRef.current += velocityLonRef.current * 16; // ~16ms per frame
-            targetLatRef.current = Math.max(
-              -MAX_LATITUDE,
-              Math.min(MAX_LATITUDE, targetLatRef.current + velocityLatRef.current * 16)
-            );
-            velocityLonRef.current *= FRICTION;
-            velocityLatRef.current *= FRICTION;
-            // Stop when below threshold
-            if (Math.abs(velocityLonRef.current) < INERTIA_THRESHOLD) velocityLonRef.current = 0;
-            if (Math.abs(velocityLatRef.current) < INERTIA_THRESHOLD) velocityLatRef.current = 0;
-          }
-        }
+        const hasInertia = !isDraggingRef.current &&
+          (Math.abs(velocityLonRef.current) > INERTIA_THRESHOLD ||
+           Math.abs(velocityLatRef.current) > INERTIA_THRESHOLD);
 
-        // During drag: snap directly to target for instant 1:1 feel.
-        // After release: LERP for smooth inertia decay.
-        if (isDraggingRef.current) {
+        if (hasInertia) {
+          // Apply velocity directly to displayed position (no LERP layer)
+          // so the transition from drag to coast is seamless
+          const frictionFactor = Math.pow(FRICTION, dt / 16); // framerate-independent
+          lonRef.current += velocityLonRef.current * dt;
+          latRef.current = Math.max(
+            -MAX_LATITUDE,
+            Math.min(MAX_LATITUDE, latRef.current + velocityLatRef.current * dt)
+          );
+          // Keep target in sync for when the next drag starts
+          targetLonRef.current = lonRef.current;
+          targetLatRef.current = latRef.current;
+          velocityLonRef.current *= frictionFactor;
+          velocityLatRef.current *= frictionFactor;
+          if (Math.abs(velocityLonRef.current) < INERTIA_THRESHOLD) velocityLonRef.current = 0;
+          if (Math.abs(velocityLatRef.current) < INERTIA_THRESHOLD) velocityLatRef.current = 0;
+        } else if (isDraggingRef.current) {
+          // During drag: snap directly to target for instant 1:1 feel
           lonRef.current = targetLonRef.current;
           latRef.current = targetLatRef.current;
         } else {
+          // LERP for other target changes (keyboard, etc.)
           lonRef.current += (targetLonRef.current - lonRef.current) * LERP_FACTOR;
           latRef.current += (targetLatRef.current - latRef.current) * LERP_FACTOR;
         }
@@ -624,7 +640,8 @@ export function usePanoramaRenderer({
     // Capture current camera orientation as the animation start point
     if (cameraRef.current) {
       recenterFromQRef.current.copy(cameraRef.current.quaternion);
-      recenterProgressRef.current = 0; // Start animation
+      recenterProgressRef.current = 0;
+      recenterStartTimeRef.current = performance.now();
     }
     // Set target: current device orientation = initial view (panorama center)
     initialGyroQRef.current = currentGyroQRef.current.clone();
