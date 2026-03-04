@@ -58,13 +58,10 @@ export function useGyroscope() {
   }, [handleOrientation]);
 
   const disable = useCallback(() => {
-    if (listenerAttachedRef.current) {
-      window.removeEventListener("deviceorientation", handleOrientation);
-      listenerAttachedRef.current = false;
-    }
+    // Keep listener attached so orientationRef stays fresh for seamless re-enable
     setIsEnabled(false);
     initialAlphaRef.current = null;
-  }, [handleOrientation]);
+  }, []);
 
   // Cleanup on unmount
   useEffect(() => {

@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 import { usePanoramaRenderer } from "../hooks/usePanoramaRenderer";
 import { useGyroscope } from "../hooks/useGyroscope";
 import { useFullscreen } from "../hooks/useFullscreen";
@@ -16,11 +16,13 @@ export default function PanoramaViewer({
   const containerRef = useRef<HTMLDivElement>(null);
   const gyro = useGyroscope();
   const { isFullscreen, toggleFullscreen } = useFullscreen();
+  const [horizonLocked, setHorizonLocked] = useState(true);
 
   const { isLoading, recenter } = usePanoramaRenderer({
     containerRef,
     imageUrl,
     gyroEnabled: gyro.isEnabled,
+    horizonLocked,
     orientationRef: gyro.orientationRef,
   });
 
@@ -56,6 +58,8 @@ export default function PanoramaViewer({
         gyroEnabled={gyro.isEnabled}
         onToggleGyro={handleToggleGyro}
         onRecenter={recenter}
+        horizonLocked={horizonLocked}
+        onToggleHorizonLock={() => setHorizonLocked((v) => !v)}
       />
     </div>
   );

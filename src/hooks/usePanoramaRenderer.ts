@@ -13,6 +13,7 @@ interface UsePanoramaRendererOptions {
   containerRef: RefObject<HTMLDivElement | null>;
   imageUrl: string;
   gyroEnabled: boolean;
+  horizonLocked: boolean;
   orientationRef: RefObject<GyroscopeOrientation>;
 }
 
@@ -20,6 +21,7 @@ export function usePanoramaRenderer({
   containerRef,
   imageUrl,
   gyroEnabled,
+  horizonLocked,
   orientationRef,
 }: UsePanoramaRendererOptions) {
   const [isLoading, setIsLoading] = useState(true);
@@ -63,10 +65,12 @@ export function usePanoramaRenderer({
   // Default camera orientation (lon=0, lat=0) for recenter
   const defaultCameraQRef = useRef(new THREE.Quaternion());
 
-  // Gyro enabled ref (to access in animation loop without stale closure)
+  // Refs for animation loop (avoid stale closures)
   const gyroEnabledRef = useRef(gyroEnabled);
   const prevGyroEnabledRef = useRef(gyroEnabled);
   gyroEnabledRef.current = gyroEnabled;
+  const horizonLockedRef = useRef(horizonLocked);
+  horizonLockedRef.current = horizonLocked;
 
   // Screen orientation for gyroscope
   const screenOrientationRef = useRef(0);
@@ -275,6 +279,8 @@ export function usePanoramaRenderer({
       if (prevGyroEnabledRef.current && !gyroEnabledRef.current) {
         initialGyroQRef.current = null;
         initialCameraQRef.current = null;
+        gyroOffsetLonRef.current = 0;
+        gyroOffsetLatRef.current = 0;
 
         // Extract camera forward direction → lon/lat for seamless transition
         const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
@@ -310,14 +316,11 @@ export function usePanoramaRenderer({
             initialCameraQRef.current = camera.quaternion.clone();
           }
 
-          // camera = initialCameraQ * inverse(initialGyroQ) * currentGyroQ
-          inverseInitQ.copy(initialGyroQRef.current).invert();
-          camera.quaternion
-            .copy(initialCameraQRef.current!)
-            .multiply(inverseInitQ)
-            .multiply(gyroQuaternion);
+          // camera = initialCameraQ * offsetQ * inverse(initialGyroQ) * currentGyroQ
+          // Touch offset defines the base direction; gyro relative motion is applied on top
+          camera.quaternion.copy(initialCameraQRef.current!);
 
-          // Apply touch offset as additional rotation
+          // Apply touch offset first (defines which direction in the panorama we face)
           if (
             gyroOffsetLonRef.current !== 0 ||
             gyroOffsetLatRef.current !== 0
@@ -332,10 +335,16 @@ export function usePanoramaRenderer({
             camera.quaternion.multiply(offsetQ);
           }
 
-          // Zero roll to keep the horizon level
-          rollCorrectionEuler.setFromQuaternion(camera.quaternion, 'YXZ');
-          rollCorrectionEuler.z = 0;
-          camera.quaternion.setFromEuler(rollCorrectionEuler);
+          // Then apply relative gyro motion (device movement since activation)
+          inverseInitQ.copy(initialGyroQRef.current).invert();
+          camera.quaternion.multiply(inverseInitQ).multiply(gyroQuaternion);
+
+          // Optionally zero roll to keep the horizon level
+          if (horizonLockedRef.current) {
+            rollCorrectionEuler.setFromQuaternion(camera.quaternion, 'YXZ');
+            rollCorrectionEuler.z = 0;
+            camera.quaternion.setFromEuler(rollCorrectionEuler);
+          }
         }
       } else {
         // Smooth interpolation for manual controls

@@ -12,6 +12,8 @@ interface ViewerControlsProps {
   gyroEnabled: boolean;
   onToggleGyro: () => void;
   onRecenter: () => void;
+  horizonLocked: boolean;
+  onToggleHorizonLock: () => void;
 }
 
 export default function ViewerControls({
@@ -22,6 +24,8 @@ export default function ViewerControls({
   gyroEnabled,
   onToggleGyro,
   onRecenter,
+  horizonLocked,
+  onToggleHorizonLock,
 }: ViewerControlsProps) {
   // Gyro discovery prompt — shown once per viewer session on mobile
   const [showGyroPrompt, setShowGyroPrompt] = useState(
@@ -157,6 +161,40 @@ export default function ViewerControls({
                   <path
                     strokeLinecap="round"
                     d="M12 2v4m0 12v4M2 12h4m12 0h4"
+                  />
+                </svg>
+              </button>
+            )}
+
+            {/* Horizon lock toggle — only when gyro is active */}
+            {gyroEnabled && (
+              <button
+                onClick={onToggleHorizonLock}
+                className={`pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-sm transition-colors ${
+                  horizonLocked
+                    ? "bg-violet-500/80 text-white"
+                    : "bg-black/50 text-white hover:bg-black/70"
+                }`}
+                title={horizonLocked ? "Unlock horizon" : "Lock horizon"}
+              >
+                <svg
+                  className="h-5 w-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    d="M3 12h18"
+                  />
+                  <path
+                    strokeLinecap="round"
+                    d="M7 8l-4 4 4 4"
+                  />
+                  <path
+                    strokeLinecap="round"
+                    d="M17 8l4 4-4 4"
                   />
                 </svg>
               </button>
