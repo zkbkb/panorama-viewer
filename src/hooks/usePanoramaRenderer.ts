@@ -507,9 +507,15 @@ export function usePanoramaRenderer({
           }
         }
 
-        // Smooth interpolation for manual controls
-        lonRef.current += (targetLonRef.current - lonRef.current) * LERP_FACTOR;
-        latRef.current += (targetLatRef.current - latRef.current) * LERP_FACTOR;
+        // During drag: snap directly to target for instant 1:1 feel.
+        // After release: LERP for smooth inertia decay.
+        if (isDraggingRef.current) {
+          lonRef.current = targetLonRef.current;
+          latRef.current = targetLatRef.current;
+        } else {
+          lonRef.current += (targetLonRef.current - lonRef.current) * LERP_FACTOR;
+          latRef.current += (targetLatRef.current - latRef.current) * LERP_FACTOR;
+        }
 
         const phi = (90 - latRef.current) * DEG2RAD;
         const theta = lonRef.current * DEG2RAD;
