@@ -129,7 +129,7 @@ export default function ViewerControls({
               </span>
               <button
                 onClick={handleEnableFromPrompt}
-                className="shrink-0 rounded-full bg-violet-500 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-violet-400"
+                className="shrink-0 rounded-full bg-white px-4 py-1.5 text-sm font-medium text-black transition-colors hover:bg-white/80"
               >
                 Enable
               </button>
@@ -172,7 +172,7 @@ export default function ViewerControls({
                 onClick={onToggleHorizonLock}
                 className={`pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-sm transition-colors ${
                   horizonLocked
-                    ? "bg-violet-500/80 text-white"
+                    ? "bg-white/90 text-black"
                     : "bg-black/50 text-white hover:bg-black/70"
                 }`}
                 title={horizonLocked ? "Unlock horizon" : "Lock horizon"}
@@ -205,7 +205,7 @@ export default function ViewerControls({
               onClick={onToggleGyro}
               className={`pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-sm transition-colors ${
                 gyroEnabled
-                  ? "bg-violet-500/80 text-white"
+                  ? "bg-white/90 text-black"
                   : "bg-black/50 text-white hover:bg-black/70"
               }`}
               title={gyroEnabled ? "Disable gyroscope" : "Enable gyroscope"}
