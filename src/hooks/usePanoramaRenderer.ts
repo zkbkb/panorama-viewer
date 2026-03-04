@@ -195,7 +195,7 @@ export function usePanoramaRenderer({
           targetLonRef.current = dragStartLonRef.current + deltaX;
           targetLatRef.current = Math.max(
             -85,
-            Math.min(85, dragStartLatRef.current + deltaY)
+            Math.min(85, dragStartLatRef.current - deltaY)
           );
         }
       }
@@ -207,6 +207,18 @@ export function usePanoramaRenderer({
       if (pointersRef.current.size === 0) {
         isDraggingRef.current = false;
         canvas.style.cursor = "grab";
+      } else if (pointersRef.current.size === 1) {
+        // Transitioning from pinch back to single-finger drag:
+        // reset start position so the next pointermove doesn't jump
+        const remaining = Array.from(pointersRef.current.values())[0];
+        pointerStartRef.current = { x: remaining.x, y: remaining.y };
+        if (gyroEnabledRef.current) {
+          gyroDragStartOffsetLonRef.current = gyroOffsetLonRef.current;
+          gyroDragStartOffsetLatRef.current = gyroOffsetLatRef.current;
+        } else {
+          dragStartLonRef.current = targetLonRef.current;
+          dragStartLatRef.current = targetLatRef.current;
+        }
       }
     };
 
@@ -242,6 +254,7 @@ export function usePanoramaRenderer({
     const inverseInitQ = new THREE.Quaternion();
     const offsetQ = new THREE.Quaternion();
     const offsetEuler = new THREE.Euler();
+    const rollCorrectionEuler = new THREE.Euler();
 
     // Animation loop
     const animate = () => {
@@ -303,6 +316,11 @@ export function usePanoramaRenderer({
             offsetQ.setFromEuler(offsetEuler);
             camera.quaternion.multiply(offsetQ);
           }
+
+          // Zero roll to keep the horizon level
+          rollCorrectionEuler.setFromQuaternion(camera.quaternion, 'YXZ');
+          rollCorrectionEuler.z = 0;
+          camera.quaternion.setFromEuler(rollCorrectionEuler);
         }
       } else {
         // Smooth interpolation for manual controls
