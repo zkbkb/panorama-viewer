@@ -9,11 +9,7 @@ export interface GyroscopeOrientation {
 export function useGyroscope() {
   const [isAvailable] = useState(() => !!window.DeviceOrientationEvent);
   const [isEnabled, setIsEnabled] = useState(false);
-  const orientationRef = useRef<GyroscopeOrientation>({
-    alpha: 0,
-    beta: 0,
-    gamma: 0,
-  });
+  const orientationRef = useRef<GyroscopeOrientation | null>(null);
   const initialAlphaRef = useRef<number | null>(null);
   const listenerAttachedRef = useRef(false);
 
@@ -58,13 +54,10 @@ export function useGyroscope() {
   }, [handleOrientation]);
 
   const disable = useCallback(() => {
-    if (listenerAttachedRef.current) {
-      window.removeEventListener("deviceorientation", handleOrientation);
-      listenerAttachedRef.current = false;
-    }
+    // Keep listener attached so orientationRef stays fresh for seamless re-enable
     setIsEnabled(false);
     initialAlphaRef.current = null;
-  }, [handleOrientation]);
+  }, []);
 
   // Cleanup on unmount
   useEffect(() => {

@@ -14,6 +14,16 @@ A mobile-first web application for viewing equirectangular panorama images in im
 - **Fullscreen** — Fullscreen toggle on desktop browsers
 - **Mobile-First** — Dark theme, responsive layout, 44px+ touch targets
 
+## Usage Guide
+
+1. **Upload a panorama** — Open the app and drag-and-drop (or click to select) an equirectangular panorama image.
+2. **Look around** — Drag with your finger or mouse to pan the view. Pinch (mobile) or scroll (desktop) to zoom in/out.
+3. **Enable gyroscope** (mobile) — Tap the gyroscope button (bottom-right) to explore by moving your phone. On iOS you'll be prompted to grant motion permission.
+4. **Drag to adjust** — While gyroscope is active, you can still drag to fine-tune the viewing direction.
+5. **Recenter** — Tap the crosshair button to snap the view back to the panorama center.
+6. **Horizon lock** — Tap the level icon to keep the horizon perfectly level, preventing roll when tilting your phone.
+7. **Fullscreen** (desktop) — Tap the expand button in the top-right corner for an immersive fullscreen experience.
+
 ## Tech Stack
 
 - [Vite](https://vite.dev/) — Build tool

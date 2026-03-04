@@ -26,12 +26,10 @@ export default function HintToast({
     text = "Drag to look around \u00B7 Scroll to zoom";
   }
 
+  if (!visible) return null;
+
   return (
-    <div
-      className={`pointer-events-none fixed bottom-12 left-1/2 z-20 -translate-x-1/2 transition-opacity duration-700 ${
-        visible ? "opacity-100" : "opacity-0"
-      }`}
-    >
+    <div className="pointer-events-none transition-opacity duration-700">
       <div className="rounded-full bg-black/60 px-5 py-2.5 text-sm text-white/90 backdrop-blur-sm">
         {text}
       </div>
