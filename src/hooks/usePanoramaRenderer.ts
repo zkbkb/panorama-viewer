@@ -60,6 +60,8 @@ export function usePanoramaRenderer({
   const initialCameraQRef = useRef<THREE.Quaternion | null>(null);
   // Track current raw gyro quaternion for recenter
   const currentGyroQRef = useRef(new THREE.Quaternion());
+  // Default camera orientation (lon=0, lat=0) for recenter
+  const defaultCameraQRef = useRef(new THREE.Quaternion());
 
   // Gyro enabled ref (to access in animation loop without stale closure)
   const gyroEnabledRef = useRef(gyroEnabled);
@@ -98,6 +100,10 @@ export function usePanoramaRenderer({
       1000
     );
     cameraRef.current = camera;
+
+    // Capture default orientation (lon=0, lat=0 → looking at +X)
+    camera.lookAt(500, 0, 0);
+    defaultCameraQRef.current.copy(camera.quaternion);
 
     // Scene
     const scene = new THREE.Scene();
@@ -195,7 +201,7 @@ export function usePanoramaRenderer({
           targetLonRef.current = dragStartLonRef.current + deltaX;
           targetLatRef.current = Math.max(
             -85,
-            Math.min(85, dragStartLatRef.current - deltaY)
+            Math.min(85, dragStartLatRef.current + deltaY)
           );
         }
       }
@@ -265,10 +271,19 @@ export function usePanoramaRenderer({
       camera.fov = fovRef.current;
       camera.updateProjectionMatrix();
 
-      // Detect gyro toggle: clear reference quaternions when disabled
+      // Detect gyro toggle: when disabled, extract current view as lon/lat
       if (prevGyroEnabledRef.current && !gyroEnabledRef.current) {
         initialGyroQRef.current = null;
         initialCameraQRef.current = null;
+
+        // Extract camera forward direction → lon/lat for seamless transition
+        const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+        const extractedLat = Math.asin(Math.max(-1, Math.min(1, fwd.y))) / DEG2RAD;
+        const extractedLon = Math.atan2(fwd.z, fwd.x) / DEG2RAD;
+        lonRef.current = extractedLon;
+        latRef.current = extractedLat;
+        targetLonRef.current = extractedLon;
+        targetLatRef.current = extractedLat;
       }
       prevGyroEnabledRef.current = gyroEnabledRef.current;
 
@@ -308,7 +323,7 @@ export function usePanoramaRenderer({
             gyroOffsetLatRef.current !== 0
           ) {
             offsetEuler.set(
-              -gyroOffsetLatRef.current * DEG2RAD,
+              gyroOffsetLatRef.current * DEG2RAD,
               -gyroOffsetLonRef.current * DEG2RAD,
               0,
               "YXZ"
@@ -402,24 +417,9 @@ export function usePanoramaRenderer({
   }, [imageUrl]);
 
   const recenter = useCallback(() => {
-    // Reset reference: current device orientation = current camera direction
+    // Reset to panorama center: current device orientation = initial view
     initialGyroQRef.current = currentGyroQRef.current.clone();
-    if (cameraRef.current) {
-      // Capture camera quaternion WITHOUT the touch offset
-      const cam = cameraRef.current.quaternion.clone();
-      // Undo touch offset to get the pure gyro-mapped orientation
-      if (gyroOffsetLonRef.current !== 0 || gyroOffsetLatRef.current !== 0) {
-        const undoEuler = new THREE.Euler(
-          -gyroOffsetLatRef.current * DEG2RAD,
-          -gyroOffsetLonRef.current * DEG2RAD,
-          0,
-          "YXZ"
-        );
-        const undoQ = new THREE.Quaternion().setFromEuler(undoEuler).invert();
-        cam.multiply(undoQ);
-      }
-      initialCameraQRef.current = cam;
-    }
+    initialCameraQRef.current = defaultCameraQRef.current.clone();
     gyroOffsetLonRef.current = 0;
     gyroOffsetLatRef.current = 0;
   }, []);
