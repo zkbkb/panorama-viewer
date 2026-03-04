@@ -7,7 +7,7 @@ export interface GyroscopeOrientation {
 }
 
 export function useGyroscope() {
-  const [isAvailable, setIsAvailable] = useState(false);
+  const [isAvailable] = useState(() => !!window.DeviceOrientationEvent);
   const [isEnabled, setIsEnabled] = useState(false);
   const orientationRef = useRef<GyroscopeOrientation>({
     alpha: 0,
@@ -16,13 +16,6 @@ export function useGyroscope() {
   });
   const initialAlphaRef = useRef<number | null>(null);
   const listenerAttachedRef = useRef(false);
-
-  // Check availability on mount
-  useEffect(() => {
-    if (window.DeviceOrientationEvent) {
-      setIsAvailable(true);
-    }
-  }, []);
 
   const handleOrientation = useCallback((event: DeviceOrientationEvent) => {
     if (event.alpha === null) return;

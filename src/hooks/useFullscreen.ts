@@ -17,7 +17,8 @@ export function useFullscreen() {
         await document.documentElement.requestFullscreen();
         // Attempt landscape lock (non-blocking)
         try {
-          await (screen.orientation as any)?.lock?.("landscape");
+          // @ts-expect-error screen.orientation.lock is not in all TS libs
+          await screen.orientation?.lock?.("landscape");
         } catch {
           // Ignore if unsupported
         }

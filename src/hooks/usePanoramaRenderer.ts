@@ -65,7 +65,8 @@ export function usePanoramaRenderer({
   useEffect(() => {
     const handleOrientationChange = () => {
       screenOrientationRef.current =
-        (window.screen?.orientation?.angle ?? (window as any).orientation ?? 0) *
+        (window.screen?.orientation?.angle ??
+          (window as { orientation?: number }).orientation ?? 0) *
         DEG2RAD;
     };
     handleOrientationChange();
